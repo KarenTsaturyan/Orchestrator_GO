@@ -20,11 +20,29 @@ type Worker struct {
 	Name      string
 	Queue     queue.Queue
 	Db        map[uuid.UUID]*task.Task
+	Stats     *Stats
 	TaskCount int
 }
 
+func (w *Worker) GetTasks() []*task.Task {
+	tasks := []*task.Task{}
+	for _, t := range w.Db {
+		tasks = append(tasks, t)
+	}
+	return tasks
+}
+
+func (w *Worker) AddTask(t task.Task) {
+	w.Queue.Enqueue(t)
+}
+
 func (w *Worker) CollectStats() {
-	fmt.Println("I will collect stats")
+	for {
+		log.Println("Collecting stats")
+		w.Stats = GetStats()
+		w.Stats.TaskCount = w.TaskCount
+		time.Sleep(15 * time.Second)
+	}
 }
 
 func (w *Worker) RunTask() task.DockerResult {
@@ -47,10 +65,10 @@ func (w *Worker) RunTask() task.DockerResult {
 		case task.Completed:
 			result = w.StopTask(taskQueued)
 		default:
-			result.Error = errors.New("We should not get here")
+			result.Error = errors.New("we should not get here")
 		}
 	} else {
-		err := fmt.Errorf("Invalid transition from %v to %v", taskPersisted.State, taskQueued.State)
+		err := fmt.Errorf("invalid transition from %v to %v", taskPersisted.State, taskQueued.State)
 		result.Error = err
 	}
 	return result
@@ -85,8 +103,4 @@ func (w *Worker) StopTask(t task.Task) task.DockerResult {
 	w.Db[t.ID] = &t
 	log.Printf("Stopped and removed container %v for task %v\n", t.ContainerID, t.ID)
 	return result
-}
-
-func (w *Worker) AddTask(t task.Task) {
-	w.Queue.Enqueue(t)
 }
