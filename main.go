@@ -54,10 +54,10 @@ import (
 
 func main() {
 	// API_HOST=localhost API_PORT=5555 go run main.go
-	host := os.Getenv("CUBE_HOST")
-	port, _ := strconv.Atoi(os.Getenv("CUBE_PORT"))
+	host := os.Getenv("API_HOST")
+	port, _ := strconv.Atoi(os.Getenv("API_PORT"))
 
-	fmt.Println("Starting Cube worker")
+	fmt.Println("Starting Orchestrator worker")
 
 	w := worker.Worker{
 		Queue: *queue.New(),
