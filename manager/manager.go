@@ -78,12 +78,12 @@ func (m *Manager) updateTasks() {
 		if err != nil {
 			log.Printf("Error connecting to %v: %v\n", worker, err)
 		}
+		d := json.NewDecoder(resp.Body)
 
 		if resp.StatusCode != http.StatusOK {
 			log.Printf("Error sending request: %v\n", err)
 		}
 
-		d := json.NewDecoder(resp.Body)
 		var tasks []*task.Task
 		err = d.Decode(&tasks)
 		if err != nil {
