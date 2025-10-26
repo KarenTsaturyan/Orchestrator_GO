@@ -15,7 +15,7 @@ import (
 func (a *Api) StartTaskHandler(w http.ResponseWriter, r *http.Request) {
 	// Decode r.body(json) to TaskEvent(struct)
 	d := json.NewDecoder(r.Body)
-	d.DisallowUnknownFields()
+	// d.DisallowUnknownFields()
 
 	te := task.TaskEvent{}
 	err := d.Decode(&te)

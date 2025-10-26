@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log"
+	"math"
 	"os"
 	"time"
 
@@ -114,14 +115,8 @@ func (d *Docker) Run() DockerResult {
 	}
 
 	r := container.Resources{
-		Memory: d.Config.Memory,
-	}
-
-	cc := container.Config{
-		Image:        d.Config.Image,
-		Tty:          false,
-		Env:          d.Config.Env,
-		ExposedPorts: d.Config.ExposedPorts,
+		Memory:   d.Config.Memory,
+		NanoCPUs: int64(d.Config.Cpu * math.Pow(10, 9)),
 	}
 
 	hc := container.HostConfig{
@@ -130,13 +125,18 @@ func (d *Docker) Run() DockerResult {
 		PublishAllPorts: true, //-p {will choose available port}:5432
 	}
 
-	resp, err := d.Client.ContainerCreate(ctx, &cc, &hc, nil, nil, d.Config.Name)
+	resp, err := d.Client.ContainerCreate(ctx, &container.Config{
+		Image:        d.Config.Image,
+		Tty:          false,
+		Env:          d.Config.Env,
+		ExposedPorts: d.Config.ExposedPorts,
+	}, &hc, nil, nil, d.Config.Name)
 	if err != nil {
 		log.Printf("Error creating container using image %s: %v\n", d.Config.Image, err)
 		return DockerResult{Error: err}
 	}
 
-	if err = d.Client.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err := d.Client.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		log.Printf("Error starting container %s: %v\n", resp.ID, err)
 		return DockerResult{Error: err}
 	}

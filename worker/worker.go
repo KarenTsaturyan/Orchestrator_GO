@@ -32,17 +32,17 @@ func (w *Worker) GetTasks() []*task.Task {
 	return tasks
 }
 
-func (w *Worker) AddTask(t task.Task) {
-	w.Queue.Enqueue(t)
-}
-
 func (w *Worker) CollectStats() {
 	for {
 		log.Println("Collecting stats")
 		w.Stats = GetStats()
-		w.Stats.TaskCount = w.TaskCount
+		w.TaskCount = w.Stats.TaskCount
 		time.Sleep(15 * time.Second)
 	}
+}
+
+func (w *Worker) AddTask(t task.Task) {
+	w.Queue.Enqueue(t)
 }
 
 func (w *Worker) RunTasks() {
@@ -67,12 +67,16 @@ func (w *Worker) runTask() task.DockerResult {
 		log.Println("No tasks in the queue")
 		return task.DockerResult{Error: nil}
 	}
+
 	taskQueued := t.(task.Task)
+	fmt.Printf("Found task in queue: %v:\n", taskQueued)
+
 	taskPersisted := w.Db[taskQueued.ID]
 	if taskPersisted == nil {
 		taskPersisted = &taskQueued
 		w.Db[taskQueued.ID] = &taskQueued
 	}
+
 	var result task.DockerResult
 	if task.ValidStateTransition(taskPersisted.State, taskQueued.State) {
 		switch taskQueued.State {
@@ -81,17 +85,18 @@ func (w *Worker) runTask() task.DockerResult {
 		case task.Completed:
 			result = w.StopTask(taskQueued)
 		default:
-			result.Error = errors.New("we should not get here")
+			fmt.Printf("This is a mistake. taskPersisted: %v, taskQueued: %v\n", taskPersisted, taskQueued)
+			result.Error = errors.New("We should not get here")
 		}
 	} else {
-		err := fmt.Errorf("invalid transition from %v to %v", taskPersisted.State, taskQueued.State)
+		err := fmt.Errorf("Invalid transition from %v to %v", taskPersisted.State, taskQueued.State)
 		result.Error = err
+		return result
 	}
 	return result
 }
 
 func (w *Worker) StartTask(t task.Task) task.DockerResult {
-	t.StartTime = time.Now().UTC()
 	config := task.NewConfig(&t)
 	d := task.NewDocker(config)
 	result := d.Run()
@@ -101,15 +106,18 @@ func (w *Worker) StartTask(t task.Task) task.DockerResult {
 		w.Db[t.ID] = &t
 		return result
 	}
+
 	t.ContainerID = result.ContainerId
 	t.State = task.Running
 	w.Db[t.ID] = &t
+
 	return result
 }
 
 func (w *Worker) StopTask(t task.Task) task.DockerResult {
 	config := task.NewConfig(&t)
 	d := task.NewDocker(config)
+
 	result := d.Stop(t.ContainerID)
 	if result.Error != nil {
 		log.Printf("Error stopping container %v: %v\n", t.ContainerID, result.Error)
@@ -118,5 +126,6 @@ func (w *Worker) StopTask(t task.Task) task.DockerResult {
 	t.State = task.Completed
 	w.Db[t.ID] = &t
 	log.Printf("Stopped and removed container %v for task %v\n", t.ContainerID, t.ID)
+
 	return result
 }
